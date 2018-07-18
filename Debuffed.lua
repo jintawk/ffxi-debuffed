@@ -1,6 +1,6 @@
 _addon.name = 'Debuffed'
-_addon.author = 'Auk'
-_addon.version = '1.2'
+_addon.author = 'Jintawk/Jinvoco'
+_addon.version = '1.22'
 
 require('luau')
 packets = require('packets')
@@ -64,6 +64,28 @@ debuffs = {
 
 }
 
+whitelist = {
+    [3] = "Poison",
+    [4] = "Paralyze",
+    [5] = "Blind",
+    [6] = "Silence",
+    [13] = "Slow",
+    [148] = "Distract"
+}
+
+dia_spells = {
+    23,
+    24,
+    25,
+    26,
+    27,
+    33,
+    34,
+    35,
+    36,
+    37
+}
+
 hierarchy = {
     [23] = 1, --Dia
     [24] = 3, --Dia II
@@ -102,15 +124,30 @@ function apply_helix(target, spell)
     debuffed_mobs[target][186] = {name = spell, timer = os.clock() + 230}
 end
 
-function show_bio(debuff_table)
+function show_off_buff(debuff_table, debuffId)
     if debuff_table then
-        if debuff_table[134] and debuff_table[134] == 25 then
+        if debuff_table[debuffId] then
             return false
-        elseif debuff_table[135] and (debuff_table[135] == 231 or debuff_table[135] == 232) then
-            return false
+        else
+            return true
         end
     end
-    return true
+end
+
+function is_dia_on(debuff_table)
+    local dia_on = false
+
+    if debuff_table then
+        for effect, spell in pairs(debuff_table) do
+            for i = 1, #dia_spells do
+                if spell == dia_spells[i] then
+                    return true
+                end
+            end
+        end
+    end
+
+    return false
 end
 
 function update_box()
@@ -121,7 +158,7 @@ function update_box()
     if target and target.valid_target and target.is_npc and (target.claim_id ~= 0 or target.spawn_type == 16) then
         local debuff_table = debuffed_mobs[target.id]
 
-        current_string = 'Debuffed ['..target.name..']\n'
+        current_string = '['..target.name..']\\cs(0,255,0)'
         if debuff_table then
             for effect, spell in pairs(debuff_table) do
                 if spell then
@@ -137,8 +174,16 @@ function update_box()
 
         if player and player.status == 1 then
             current_string = current_string..'\\cs(255,0,0)'
-            if show_bio(debuff_table) then
-                current_string = current_string..'\nBio'
+
+            if not is_dia_on(debuff_table) then
+                current_string = current_string..'\nDia'
+            end
+
+            --display missing whitelisted spells (other than dia which is special)
+            for id, name in pairs(whitelist) do
+                if show_off_buff(debuff_table, id) then
+                    current_string = current_string..'\n'.. name
+                end
             end
         end
     end
@@ -197,10 +242,6 @@ windower.register_event('incoming chunk', function(id, data)
     end
 end)
 
-windower.register_event('prerender', function()
-    local curr = os.clock()
-    if curr > frame_time + .1 then
-        frame_time = curr
-        update_box()
-    end
+windower.register_event('time change', function(new, old)
+    update_box()
 end)
